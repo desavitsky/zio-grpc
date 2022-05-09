@@ -21,7 +21,7 @@ trait MetadataTests {
 
   val unaryEffect           = TestServiceClient.unary(Request())
   val serverStreamingEffect =
-    TestServiceClient.serverStreaming(Request()).runCollect
+    TestServiceClient.serverStreaming(Request("Test")).runCollect
   val clientStreamingEffect = TestServiceClient.clientStreaming(ZStream.empty)
   val bidiEffect            = TestServiceClient.bidiStreaming(ZStream.empty).runCollect
 
