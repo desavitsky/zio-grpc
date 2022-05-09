@@ -118,7 +118,7 @@ lazy val e2e =
           "scalapb.zio_grpc.ZioCodeGenerator$"
         )                        -> (Compile / sourceManaged).value
       ),
-      PB.protocVersion     := "3.13.0",
+      PB.protocVersion     := "3.19.0",
       codeGenClasspath     := (codeGenJVM212 / Compile / fullClasspath).value,
       testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
     )

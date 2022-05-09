@@ -13,7 +13,7 @@ import zio.Console
 import zio.stream.ZStream
 import zio.Clock
 
-object EnvSpec extends DefaultRunnableSpec with MetadataTests {
+object EnvSpec extends ZIOSpecDefault with MetadataTests {
   case class User(name: String)
 
   val getUser = ZIO.environmentWith[User](_.get)
@@ -54,11 +54,11 @@ object EnvSpec extends DefaultRunnableSpec with MetadataTests {
   def parseUser(rc: RequestContext): IO[Status, User] =
     rc.metadata.get(UserKey).flatMap {
       case Some("alice") =>
-        IO.fail(
+        ZIO.fail(
           Status.PERMISSION_DENIED.withDescription("You are not allowed!")
         )
-      case Some(name)    => IO.succeed(User(name))
-      case None          => IO.fail(Status.UNAUTHENTICATED)
+      case Some(name)    => ZIO.succeed(User(name))
+      case None          => ZIO.fail(Status.UNAUTHENTICATED)
     }
 
   val serviceLayer = ServiceWithConsole.transformContextM(parseUser(_)).toLayer
@@ -69,19 +69,21 @@ object EnvSpec extends DefaultRunnableSpec with MetadataTests {
   override def clientLayer(
       userName: Option[String]
   ): URLayer[Server, TestServiceClient] =
-    ZManaged.environmentWithManaged { (ss: ZEnvironment[Server.Service]) =>
-      ZManaged.fromZIO(ss.get[Server.Service].port).orDie flatMap { (port: Int) =>
-        val ch = ZManagedChannel(
-          ManagedChannelBuilder.forAddress("localhost", port).usePlaintext(),
-          Seq(
-            ZClientInterceptor.headersUpdater((_, _, md) => ZIO.foreach(userName)(un => md.put(UserKey, un)).unit)
+    ZLayer.scoped {
+      ZIO.environmentWithZIO { (ss: ZEnvironment[Server.Service]) =>
+        ss.get[Server.Service].port.orDie flatMap { (port: Int) =>
+          val ch = ZManagedChannel(
+            ManagedChannelBuilder.forAddress("localhost", port).usePlaintext(),
+            Seq(
+              ZClientInterceptor.headersUpdater((_, _, md) => ZIO.foreach(userName)(un => md.put(UserKey, un)).unit)
+            )
           )
-        )
-        TestServiceClient
-          .managed(ch)
-          .orDie
+          TestServiceClient
+            .managed(ch)
+            .orDie
+        }
       }
-    }.toLayer
+    }
 
   val layers = serviceLayer >>> (serverLayer ++ Annotations.live)
 
